@@ -4,6 +4,11 @@ import gql from "graphql-tag";
 import Link from "./Link";
 
 class LinkList extends Component {
+  componentDidMount() {
+    this._subscribeToNewLinks();
+    this._subscribeToNewVotes();
+  }
+
   render() {
     if (this.props.feedQuery && this.props.feedQuery.loading) {
       return <div>Loading</div>;
@@ -36,6 +41,80 @@ class LinkList extends Component {
     votedLink.votes = createVote.link.votes;
 
     store.writeQuery({ query: FEED_QUERY, data });
+  };
+
+  _subscribeToNewLinks = () => {
+    this.props.feedQuery.subscribeToMore({
+      document: gql`
+        subscription {
+          newLink {
+            node {
+              id
+              url
+              description
+              createdAt
+              postedBy {
+                id
+                name
+              }
+              votes {
+                id
+                user {
+                  id
+                }
+              }
+            }
+          }
+        }
+      `,
+      updateQuery: (previous, { subscriptionData }) => {
+        const newAllLinks = [
+          subscriptionData.data.newLink.node,
+          ...previous.feed.links
+        ];
+        const result = {
+          ...previous,
+          feed: {
+            ...previous.feed,
+            links: newAllLinks
+          }
+        };
+        return result;
+      }
+    });
+  };
+
+  _subscribeToNewVotes = () => {
+    this.props.feedQuery.subscribeToMore({
+      document: gql`
+        subscription {
+          newVote {
+            node {
+              id
+              link {
+                id
+                url
+                description
+                createdAt
+                postedBy {
+                  in
+                  name
+                }
+                votes {
+                  id
+                  user {
+                    id
+                  }
+                }
+              }
+              user {
+                id
+              }
+            }
+          }
+        }
+      `
+    });
   };
 }
 
